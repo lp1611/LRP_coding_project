@@ -55,14 +55,14 @@ def lrp_value(S: ArrayLike, K: Number, P: Number, T: Number, r: Number, sigma: N
     """
     S = _ensure_array(S) #S needs to be a numpy array!
     K1, K2 = compute_K1K2(K, P)
-    val  = P - put_price_vollib(S, K,  T, r, sigma, q) #intrinstic solution 
+    val  = P - put_price_vollib(S, K,  T, r, sigma, q) #intrinstic solution for region (K1,\infty)
     if backstop1:
-        val += 0.9 * put_price_vollib(S, K1, T, r, sigma, q) # (K2, K1)
+        val += 0.9 * put_price_vollib(S, K1, T, r, sigma, q) # (K2, K1]
     if backstop2:
-        val += 0.1 * put_price_vollib(S, K2, T, r, sigma, q)
+        val += 0.1 * put_price_vollib(S, K2, T, r, sigma, q) # (0,K2]
     return val
 
-def lrp_delta(S: ArrayLike, K: Number, P: Number, T: Number, r: Number, sigma: Number, q: Number=0.,
+def lrp_delta(S: ArrayLike, K: Number, P: Number, T: Number, r: Number, sigma: Number, q: Number=0., 
               backstop1: bool=True, backstop2: bool=True):
     """Underwriter delta: -\Delta(K) + 0.9\Delta(K1) [if backstop1 on] + 0.1\Delta(K2) [if backstop2 on]."""
     S = _ensure_array(S) #S needs to be a numpy array!
@@ -78,10 +78,106 @@ def lrp_value_expiry(S: ArrayLike, K: Number, P: Number, backstop1: bool=True, b
     """Exact piecewise-linear value at T=0."""
     S = _ensure_array(S)
     K1, K2 = compute_K1K2(K, P)
-    val = P - np.maximum(K - S, 0.)          # region (K1,\infty)
-    if backstop1: val += 0.9 * np.maximum(K1 - S, 0.)  # region (K2, K1]
-    if backstop2: val += 0.1 * np.maximum(K2 - S, 0.)  # region (0, K2]
+    val = P - np.maximum(K - S, 0.)          # (K1,\infty)
+    if backstop1: val += 0.9 * np.maximum(K1 - S, 0.)  # (K2, K1]
+    if backstop2: val += 0.1 * np.maximum(K2 - S, 0.)  # (0, K2]
     return val
+
+def plot_value_and_delta(
+    K: Number, P: Number, T: Number, r: Number, sigma: Number, q: Number = 0.0,
+    backstop1: bool = True, backstop2: bool = True,
+    save_prefix: str = None, show: bool = True
+):
+    """Draw Value and Delta vs S with colored curves and colored K/K1/K2 lines."""
+    K1, K2 = compute_K1K2(K, P)
+    S_expiry = np.linspace(0.0, 2.0*K, 500)
+    S_bsm    = np.linspace(1e-8, 2.0*K, 500)  # avoid S=0 for BSM logs/derivatives 
+
+    # Choose colours
+    color_value = "tab:blue"
+    color_delta = "tab:orange"
+    color_K  = "tab:red"
+    color_K1 = "tab:green"
+    color_K2 = "tab:purple"
+
+    if T <= 0.0: #intinstric solution 
+        x_val, y_val = S_expiry, lrp_value_expiry(S_expiry, K, P, backstop1, backstop2)
+    else: # use BSM
+        x_val, y_val = S_bsm, lrp_value(S_bsm, K, P, T, r, sigma, q, backstop1, backstop2)
+
+    # Plot underwriter val fig
+    plt.figure()
+    value_line, = plt.plot(x_val, y_val, color=color_value, linewidth=2, label="Underwriter Value")
+
+    # Vertical lines
+    line_K  = plt.axvline(K,  color=color_K,  linestyle="--", linewidth=1.5, label="K")
+    line_K1 = plt.axvline(K1, color=color_K1, linestyle="--", linewidth=1.5, label="K1")
+    line_K2 = plt.axvline(K2, color=color_K2, linestyle="--", linewidth=1.5, label="K2")
+
+    plt.title(f"LRP Underwriter Value (T={T:.4f}, sigma={sigma}, r={r}, q={q})")
+    plt.xlabel("Underlying price S")
+    plt.ylabel("Underwriter value")
+
+    # Legend 
+    handles = [value_line, line_K, line_K1, line_K2]
+    labels  = [h.get_label() for h in handles]
+    plt.legend(handles, labels, loc="best")
+    if save_prefix:
+        plt.savefig(f"{save_prefix}_value.png", dpi=180, bbox_inches="tight")
+
+    # Figure for delta
+    T_for_delta = 1e-8 if T <= 0.0 else T #cap to avoid log(0)
+    d = lrp_delta(S_bsm, K, P, T_for_delta, r, sigma, q, backstop1, backstop2)
+
+    plt.figure()
+    delta_line, = plt.plot(S_bsm, d, color=color_delta, linewidth=2, label="Underwriter Delta")
+    line_K  = plt.axvline(K,  color=color_K,  linestyle="--", linewidth=1.5, label="K")
+    line_K1 = plt.axvline(K1, color=color_K1, linestyle="--", linewidth=1.5, label="K1")
+    line_K2 = plt.axvline(K2, color=color_K2, linestyle="--", linewidth=1.5, label="K2")
+
+    plt.title(f"LRP Underwriter Delta (T={T:.4f}, sigma={sigma}, r={r}, q={q})")
+    plt.xlabel("Underlying price S")
+    plt.ylabel("Delta (dValue/dS)")
+    handles = [delta_line, line_K, line_K1, line_K2]
+    labels  = [h.get_label() for h in handles]
+    plt.legend(handles, labels, loc="best")
+    if save_prefix:
+        plt.savefig(f"{save_prefix}_delta.png", dpi=180, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close("all")
+
+
+# interface with command line 
+def parse_args():
+    p = argparse.ArgumentParser(description="LRP reinsured value & delta (vollib).")
+    p.add_argument("--K", type=float, default=100., help="Coverage price (strike)")
+    p.add_argument("--P", type=float, default=10., help="Premium")
+    p.add_argument("--T", type=float, default=0.25, help="Fraction of year to expiry (e.g 0 (exp) or 1 (year))")
+    p.add_argument("--sigma", type=float, default=1., help="Annualized volatility")
+    p.add_argument("--r", type=float, default=0., help="Risk-free")
+    p.add_argument("--q", type=float, default=0., help="Continuous yield (set to zero here)")
+
+    # backstops with on/off flags
+    g1 = p.add_mutually_exclusive_group()
+    g1.add_argument("--backstop1", dest="backstop1", action="store_true", help="Enable Backstop 1 (default)")
+    g1.add_argument("--no-backstop1", dest="backstop1", action="store_false", help="Disable Backstop 1")
+    p.set_defaults(backstop1=True)
+
+    g2 = p.add_mutually_exclusive_group()
+    g2.add_argument("--backstop2", dest="backstop2", action="store_true", help="Enable Backstop 2 (default)")
+    g2.add_argument("--no-backstop2", dest="backstop2", action="store_false", help="Disable Backstop 2")
+    p.set_defaults(backstop2=True)
+
+    p.add_argument("--save-prefix", type=str, default=None, help="If set, save PNGs with this prefix")
+    p.add_argument("--no-show", action="store_true", help="Do not open figure windows")
+
+    # SANITY CHECK print exact expiry value at a specific S 
+    p.add_argument("--S-check", type=float, default=None, help="Print expiry value at this S and exit")
+
+    return p.parse_args()
 
 def main():
     args = parse_args()
@@ -89,11 +185,16 @@ def main():
     K1, K2 = compute_K1K2(args.K, args.P)
     print(f"K1={K1:.4f}, K2={K2:.4f}")
 
-    if args.S_check is not None:
+    if args.S_check is not None: #Sanity check only 
         v = lrp_value_expiry(args.S_check, args.K, args.P, args.backstop1, args.backstop2)
-        # when S_check is scalar, v is scalar-like; cast to float for a neat print
-        print(f"Expiry value at S={args.S_check}: {float(v):.4f}")
+        print(f"Expiry value at S={args.S_check}: {float(v):.3f}")
         return
+
+    plot_value_and_delta( #Plot graphs of value and deltas
+        K=args.K, P=args.P, T=args.T, r=args.r, sigma=args.sigma, q=args.q,
+        backstop1=args.backstop1, backstop2=args.backstop2,
+        save_prefix=args.save_prefix, show=not args.no_show
+    )
 
 if __name__ == "__main__":
     main()
