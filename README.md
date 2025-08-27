@@ -12,7 +12,7 @@ pip install -r requirements.txt
 ```
 
 # Run (this is an example)
-python main.py \
+```python main.py \
 --K 100 \
 --P 10 \
 --T 0 \
@@ -24,9 +24,10 @@ python main.py \
 --backstop2 \
 --no-show \
 --S-check 10
+```
 
 or simply 
-python main.py \
+```python main.py \
 --K 100 \
 --P 10 \
 --T 0 \
@@ -36,6 +37,7 @@ python main.py \
 --save-prefix charts \
 --no-show \
 --S-check 10
+```
 
 Here in this example: 
 --K 100 \ #Coverage/strike price K - float at \$100
