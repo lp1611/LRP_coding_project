@@ -2,7 +2,7 @@ This tool models the underwriter’s PnL for a Livestock Risk Protection (LRP) p
 
 For strike $K$, and premium $P$, we define the backstrops: 1) $K_1 = K-1.5P$ and $K_2 = K - 5P$. The underwriter's reinsured payoff at expiration is 
    Value as the underwriter= $P - \text{Put}(K) + 0.9\text{Put}(K1) \text{(if backstop1 on)} + 0.1\text{Put}(K2) \text{(if backstop2 on)}$. 
-This code provide charts 1) $S$ vs value $V$ (underwriter's value) and 2) $S$ vs $\delta V/\delta S$ ($\Delta$) which provides the change in value per dollar change in stock price. 
+This code provide charts 1) $S$ vs value $V$ (underwriter's value) and 2) $S$ vs $ \partial V/ \partial S$ ($\Delta$) which provides the change in value per dollar change in stock price. 
 
 # TO Install
 ```bash
