@@ -40,7 +40,7 @@ or simply
 ```
 
 Here in this example: 
---K 100 \ #Coverage/strike price K - float at \$100
+```--K 100 \ #Coverage/strike price K - float at \$100
 --P 10 \ # Premium collected by underwriter - float at \$10
 --T 0 \ #Fraction of year to expiry - float (example is at expiry)
 --sigma 1. \ # Annualized volatility - float. 
@@ -51,5 +51,5 @@ Here in this example:
 --backstop2 \ # --backstop2/--no-backstop2 to toggle USDA backstop 2 on/off (default on)
 --no-show \ #Don’t open figure windows - flag
 --S-check 10 \ # Sanity mode: print exact expiration value at livestock price and exit (example at \$10)
-
+```
  
